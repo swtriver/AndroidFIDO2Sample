@@ -2,6 +2,8 @@ package app.prprhyt.androidfido2sample;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import com.google.android.gms.fido.fido2.*;
+
 
 public class MainActivity extends AppCompatActivity {
 
