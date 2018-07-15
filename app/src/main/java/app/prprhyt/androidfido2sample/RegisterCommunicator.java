@@ -13,7 +13,7 @@ import com.upokecenter.cbor.CBORObject;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.cert.CertificateException;
-import java.util.ArrayList
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.net.ssl.HostnameVerifier;
