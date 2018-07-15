@@ -5,8 +5,22 @@ import android.content.Context;
 import com.google.android.gms.fido.fido2.api.common.MakeCredentialOptions;
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialRequestOptions;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.security.cert.CertificateException;
+import java.util.List;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import co.nstant.in.cbor.CborDecoder;
+import co.nstant.in.cbor.CborException;
+import co.nstant.in.cbor.model.DataItem;
+import okhttp3.OkHttpClient;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -25,6 +39,7 @@ public class RegisterCommunicator {
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl("https://localhost:5000/")
                 .addConverterFactory(GsonConverterFactory.create())
+                .client(getUnsafeOkHttpClient())
                 .build();
         service = retrofit.create(FIDO2RegistorService.class);
     }
@@ -34,7 +49,14 @@ public class RegisterCommunicator {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
                 try{
-                listener.onResponse(MakeCredentialOptions.deserializeFromBytes(response.body().bytes()));
+                    ByteArrayInputStream bais = new ByteArrayInputStream(response.body().bytes());
+                    List<DataItem> dataItems = new CborDecoder(bais).decode();
+                    for(DataItem dataItem : dataItems) {
+                        // process data item
+                    }
+                    //listener.onResponse(MakeCredentialOptions.deserializeFromBytes(test));
+                }catch (CborException e){
+                    listener.onFailure(e);
                 }catch (IOException e){
                     listener.onFailure(e);
                 }
@@ -89,4 +111,48 @@ public class RegisterCommunicator {
         @POST("api/register/complete")
         Call<ResponseBody> register_complete(@Body byte[] requestOptions);
     }
+
+
+    private static OkHttpClient getUnsafeOkHttpClient() {
+        try {
+            // Create a trust manager that does not validate certificate chains
+            final TrustManager[] trustAllCerts = new TrustManager[] {
+                    new X509TrustManager() {
+                        @Override
+                        public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+                        }
+
+                        @Override
+                        public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) throws CertificateException {
+                        }
+
+                        @Override
+                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                            return new java.security.cert.X509Certificate[]{};
+                        }
+                    }
+            };
+
+            // Install the all-trusting trust manager
+            final SSLContext sslContext = SSLContext.getInstance("SSL");
+            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+            // Create an ssl socket factory with our all-trusting manager
+            final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+
+            OkHttpClient.Builder builder = new OkHttpClient.Builder();
+            builder.sslSocketFactory(sslSocketFactory);
+            builder.hostnameVerifier(new HostnameVerifier() {
+                @Override
+                public boolean verify(String hostname, SSLSession session) {
+                    return true;
+                }
+            });
+
+            OkHttpClient okHttpClient = builder.build();
+            return okHttpClient;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }
