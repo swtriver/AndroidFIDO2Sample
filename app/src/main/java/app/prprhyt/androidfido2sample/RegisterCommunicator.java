@@ -3,11 +3,17 @@ package app.prprhyt.androidfido2sample;
 import android.content.Context;
 
 import com.google.android.gms.fido.fido2.api.common.MakeCredentialOptions;
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialEntity;
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialParameters;
 import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialRequestOptions;
+import com.google.android.gms.fido.fido2.api.common.PublicKeyCredentialUserEntity;
+import com.google.gson.Gson;
+import com.upokecenter.cbor.CBORObject;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.cert.CertificateException;
+import java.util.ArrayList
 import java.util.List;
 
 import javax.net.ssl.HostnameVerifier;
@@ -17,9 +23,7 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import co.nstant.in.cbor.CborDecoder;
-import co.nstant.in.cbor.CborException;
-import co.nstant.in.cbor.model.DataItem;
+import app.prprhyt.androidfido2sample.ret.RegisteredCredentialOptions;
 import okhttp3.OkHttpClient;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
@@ -30,6 +34,8 @@ import retrofit2.converter.gson.GsonConverterFactory;
 import retrofit2.http.Body;
 import retrofit2.http.POST;
 import retrofit2.http.Query;
+
+import static com.google.android.gms.fido.fido2.api.common.AlgorithmIdentifier.ECDSA;
 
 public class RegisterCommunicator {
     private final FIDO2RegistorService service;
@@ -48,16 +54,26 @@ public class RegisterCommunicator {
         service.register_begin(id, name, dispName, iconUri).enqueue(new Callback<ResponseBody>() {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-                try{
+                try {
                     ByteArrayInputStream bais = new ByteArrayInputStream(response.body().bytes());
-                    List<DataItem> dataItems = new CborDecoder(bais).decode();
-                    for(DataItem dataItem : dataItems) {
-                        // process data item
+                    CBORObject cborObject = CBORObject.Read(bais);
+                    Gson gson = new Gson();
+                    RegisteredCredentialOptions registeredCredentialOptions = gson.fromJson(cborObject.ToJSONString(), RegisteredCredentialOptions.class);
+                    List<PublicKeyCredentialParameters> PublicKeyCredentialParametersList = new ArrayList<PublicKeyCredentialParameters>();
+                    for(RegisteredCredentialOptions.PublicKey.PubKeyCredParams pubKeyCredParams:registeredCredentialOptions.publicKey.pubKeyCredParams) {
+                        PublicKeyCredentialParametersList.add(new PublicKeyCredentialParameters(pubKeyCredParams.type, ECDSA.toString()));//Integer.toString(registeredCredentialOptions.publicKey.pubKeyCredParams.get(0).alg)));
                     }
-                    //listener.onResponse(MakeCredentialOptions.deserializeFromBytes(test));
-                }catch (CborException e){
-                    listener.onFailure(e);
-                }catch (IOException e){
+                    MakeCredentialOptions.Builder mcob = new MakeCredentialOptions.Builder();
+                    mcob.setChallenge(registeredCredentialOptions.publicKey.challenge.getBytes());
+                    mcob.setParameters(PublicKeyCredentialParametersList);
+                    mcob.setRp(new PublicKeyCredentialEntity(registeredCredentialOptions.publicKey.rp.id,registeredCredentialOptions.publicKey.rp.name,registeredCredentialOptions.publicKey.user.icon));
+                    mcob.setTimeoutSeconds(registeredCredentialOptions.publicKey.timeout);
+                    mcob.setUser(new PublicKeyCredentialUserEntity(registeredCredentialOptions.publicKey.user.id,registeredCredentialOptions.publicKey.user.name,registeredCredentialOptions.publicKey.user.icon,registeredCredentialOptions.publicKey.user.displayName));
+                    MakeCredentialOptions mco = mcob.build();
+
+                    listener.onResponse(mco);
+
+                }catch(IOException e){
                     listener.onFailure(e);
                 }
             }
