@@ -1,3 +1,9 @@
+# Attention
+This is an unofficial project.  
+Implementation is not complete. 
+It may contain unsafe implementations.  
+
+
 # Get Started
 1. Your Android Device connect to pc with ADB.
 2. Enable Proxy.
