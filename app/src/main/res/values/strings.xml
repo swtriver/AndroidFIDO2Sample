@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AndroidFIDO2Sample</string>
+    <string name="log">Log text is here</string>
 </resources>
